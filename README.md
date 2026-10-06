@@ -49,6 +49,9 @@ GROUP BY 1 ORDER BY 2 DESC;
 
 ## Production
 
+Live API: https://kasmapworld.vercel.app (`/health`, `/v1/status`).  Database: Neon `neon-violet-feather`
+(Free plan), connected through the Vercel integration as `DATABASE_URL` / `DATABASE_URL_UNPOOLED`.
+
 Frontend and API deploy to **Vercel**; the database is **Neon** (PostgreSQL + PostGIS + h3).
 Ingestion runs from GitHub Actions: set the repo secret `KASMAP_DATABASE_URL` (Neon direct
 connection) and run the *ingest* workflow.  Details: `docs/adr/0003-hosting-vercel.md`.
