@@ -1,0 +1,32 @@
+# Local development stack.  Usage (from repo root):
+#   docker compose -f infrastructure/docker-compose.yml up -d
+services:
+  db:
+    build: ./postgres
+    image: kasmap/postgres:16-postgis-h3
+    environment:
+      POSTGRES_USER: kasmap
+      POSTGRES_PASSWORD: kasmap        # dev only; production uses secrets management
+      POSTGRES_DB: kasmap
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    command:
+      - postgres
+      - -c
+      - shared_buffers=1GB
+      - -c
+      - work_mem=64MB
+      - -c
+      - maintenance_work_mem=512MB
+      - -c
+      - max_wal_size=4GB
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kasmap -d kasmap"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  pgdata:
