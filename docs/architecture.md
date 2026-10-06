@@ -21,4 +21,8 @@ OSM (Geofabrik .pbf) ──────┼─ ingestion workers ──┼─ poi
 | 5 | test-5 countries → world | |
 | 6 | proprietary outcomes, calibration | |
 
+Hosting (ADR 0003): frontend and API on **Vercel**, database on **Neon** (PostGIS + h3),
+ingestion on **GitHub Actions** (`.github/workflows/ingest.yml`) — function time and memory
+limits make Vercel unsuitable for country-scale ingestion.
+
 Decisions: see `docs/adr/`.

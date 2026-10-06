@@ -1,0 +1,46 @@
+# Ingestion runs here, not in Vercel Functions (see docs/adr/0003-hosting-vercel.md).
+# Needs repository secret KASMAP_DATABASE_URL = Neon *direct* (non-pooled) connection string.
+name: ingest
+
+on:
+  workflow_dispatch:
+    inputs:
+      countries:
+        description: "ISO2 codes, comma-separated"
+        default: "KZ"
+      overture_release:
+        description: "Overture release to pin"
+        default: "2026-08-19.0"
+  schedule:
+    - cron: "17 2 3 * *"   # monthly, after Overture's monthly release
+
+concurrency:
+  group: ingest
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    env:
+      KASMAP_DATABASE_URL: ${{ secrets.KASMAP_DATABASE_URL }}
+      KASMAP_OVERTURE_RELEASE: ${{ inputs.overture_release || '2026-08-19.0' }}
+      KASMAP_DATA_ROOT: ${{ github.workspace }}/data
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv venv && uv pip install -e ".[osm]"
+      - name: Migrate and seed
+        run: .venv/bin/kasmap db migrate && .venv/bin/kasmap db seed
+      - name: Ingest
+        run: |
+          for c in $(echo "${{ inputs.countries || 'KZ' }}" | tr ',' ' '); do
+            .venv/bin/kasmap registry sync --countries "$c"
+            .venv/bin/kasmap ingest country "$c" --no-run
+          done
+          .venv/bin/kasmap worker
+          .venv/bin/kasmap retry-failed
+          .venv/bin/kasmap worker
+      - name: Status
+        if: always()
+        run: .venv/bin/kasmap status

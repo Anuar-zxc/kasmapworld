@@ -47,6 +47,12 @@ WHERE a.name ILIKE 'Алматы%' OR a.name ILIKE 'Almaty%'
 GROUP BY 1 ORDER BY 2 DESC;
 ```
 
+## Production
+
+Frontend and API deploy to **Vercel**; the database is **Neon** (PostgreSQL + PostGIS + h3).
+Ingestion runs from GitHub Actions: set the repo secret `KASMAP_DATABASE_URL` (Neon direct
+connection) and run the *ingest* workflow.  Details: `docs/adr/0003-hosting-vercel.md`.
+
 ## Tests
 
 ```bash
