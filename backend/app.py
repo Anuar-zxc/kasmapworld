@@ -266,6 +266,22 @@ def places(city: str, response: Response, category: str = Query(...),
          "properties": {"name": r["name"], "category": r["category_id"]}} for r in rows]}
 
 
+@app.get("/v1/cities/{city}/source-categories")
+def source_categories(city: str, mapped: bool = Query(False), limit: int = Query(80, le=500)) -> list:
+    """Most frequent raw source categories (to extend the category mapping)."""
+    c = _city_or_404(city)
+    with db.connect() as conn:
+        return conn.execute(
+            f"""
+            SELECT p.source_category, p.category_id, count(*) AS n
+              FROM poi.place p JOIN geo.admin_area a ON a.id = p.admin_area_id
+             WHERE a.gers_id = %s AND p.category_id IS {'NOT' if mapped else ''} NULL
+             GROUP BY 1, 2 ORDER BY n DESC LIMIT %s
+            """,
+            (f"kasmap:city:{c.slug}", limit),
+        ).fetchall()
+
+
 # ───────────────────────────── admin ─────────────────────────────
 
 
