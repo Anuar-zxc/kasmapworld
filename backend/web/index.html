@@ -143,7 +143,7 @@ const CITY = "almaty";
 const FEATURED = ["food.cafe.coffee_shop", "health.pharmacy", "retail.convenience", "food.fast_food",
   "food.bakery", "beauty.salon", "fitness.gym", "health.dentist"];
 const RAMPS = {
-  score: { stops: ["#eef3f5", "#b9dcd6", "#5aa99f", "#2e8c84", "#0f4d57"], label: "Возможность", lo: "ниже", hi: "выше" },
+  score: { stops: ["#cfe6e2", "#8cc7bd", "#45a197", "#1f7d76", "#0f4d57"], label: "Возможность", lo: "ниже", hi: "выше" },
   competitors: { stops: ["#f6f1f5", "#dcc0d4", "#b07aa1", "#7a3b6e", "#4a1f43"], label: "Конкуренты рядом", lo: "нет", hi: "много" },
   activity: { stops: ["#fff7e6", "#fbd890", "#f2b84b", "#d58a1c", "#a35a00"], label: "Активность вокруг", lo: "тихо", hi: "оживлённо" },
 };
@@ -198,6 +198,10 @@ function paintLayer() {
     expr = ["interpolate", ["linear"], ["get", state.layer], ...quantileStops(state.scores.cells.map((c) => c[col]), ramp.stops)];
   }
   map.setPaintProperty("cells", "fill-color", expr);
+  const opKey = state.layer === "score" ? "score" : state.layer;
+  const opStops = state.layer === "score" ? [0, 0.12, 50, 0.35, 80, 0.62, 95, 0.85]
+    : quantileStops(state.scores.cells.map((c) => c[state.layer === "competitors" ? 4 : 2]), [0.08, 0.3, 0.5, 0.7, 0.85]);
+  map.setPaintProperty("cells", "fill-opacity", ["interpolate", ["linear"], ["get", opKey], ...opStops]);
   const lg = $("legend");
   lg.hidden = false;
   lg.innerHTML = `<div>${ramp.label}${state.layer === "score" ? " — " + esc(catName(state.category)).toLowerCase() : ""}</div>
@@ -213,7 +217,7 @@ async function loadScores() {
   if (map.getSource("cells")) map.getSource("cells").setData(gj);
   else {
     map.addSource("cells", { type: "geojson", data: gj });
-    map.addLayer({ id: "cells", type: "fill", source: "cells", paint: { "fill-color": "#eef3f5", "fill-opacity": 0.62 } });
+    map.addLayer({ id: "cells", type: "fill", source: "cells", paint: { "fill-color": "#eef3f5", "fill-opacity": 0.7 } });
     map.addLayer({ id: "cells-line", type: "line", source: "cells", paint: { "line-color": "#ffffff", "line-width": 0.4, "line-opacity": 0.6 } });
     map.addSource("sel", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
     map.addLayer({ id: "sel", type: "line", source: "sel", paint: { "line-color": "#17202b", "line-width": 2.5 } });
@@ -277,7 +281,7 @@ function renderResults() {
   el.innerHTML = `<ol class="results">${state.best.map((r, i) => `
     <li class="result" tabindex="0" data-h3="${r.h3}">
       <span class="rank">${i + 1}</span>
-      <div><div class="r-title">Участок ${i + 1}</div><div class="r-why">${esc(r.why[0]?.text ?? "")}</div></div>
+      <div><div class="r-title">${r.landmark ? "Рядом: " + esc(r.landmark) : "Участок " + (i + 1)}</div><div class="r-why">${esc(r.why[0]?.text ?? "")}</div></div>
       <span class="r-score">${r.score}</span>
     </li>`).join("")}</ol>`;
   el.querySelectorAll(".result").forEach((li) => {
@@ -330,15 +334,20 @@ function renderChooser() {
       <option value="">Другой тип бизнеса…</option>
       ${rest.map((c) => `<option value="${c.id}" ${c.id === state.category ? "selected" : ""}>${esc(c.name)} (${c.count})</option>`).join("")}
     </select>
+    <p class="hint" id="coverage"></p>
     <button class="cta" id="find">Найти лучшие места</button>
     <p class="hint">Оценка 0–100 сравнивает участки города по активности вокруг, точкам притяжения и конкуренции. Это сравнительный индекс, а не вероятность успеха.</p>
     <div id="results"></div>
     <div id="detail" class="detail" hidden></div>`;
+  const coverage = () => {
+    const c = state.meta.categories.find((x) => x.id === state.category);
+    $("coverage").textContent = c ? `В открытых данных: ${c.count.toLocaleString("ru-RU")} — «${c.name.toLowerCase()}» в Алматы. Покрытие неполное, данные пополняются.` : "";
+  };
   const setCat = (id) => {
     state.category = id; state.best = []; markers.forEach((m) => m.remove()); markers = [];
     document.querySelectorAll(".chip").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.cat === id)));
     $("headline").textContent = `Где открыть: ${catName(id).toLowerCase()}`;
-    $("results").innerHTML = ""; $("detail").hidden = true;
+    $("results").innerHTML = ""; $("detail").hidden = true; coverage();
     loadScores().catch(() => {});
   };
   document.querySelectorAll(".chip").forEach((b) => b.addEventListener("click", () => { $("more").value = ""; setCat(b.dataset.cat); }));
@@ -347,6 +356,7 @@ function renderChooser() {
   const observer = new MutationObserver(() => { $("detail").hidden = !$("detail").innerHTML.trim(); });
   observer.observe($("detail"), { childList: true });
   $("headline").textContent = `Где открыть: ${catName(state.category).toLowerCase()}`;
+  coverage();
   loadScores().catch(() => {});
 }
 

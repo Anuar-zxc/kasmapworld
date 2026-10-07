@@ -196,10 +196,24 @@ def _cell_payload(c: scoring.CellScore) -> dict:
 @app.get("/v1/cities/{city}/best")
 def best(city: str, response: Response, category: str = Query(...),
          limit: int = Query(5, ge=1, le=20)) -> dict:
+    import h3  # noqa: PLC0415
+
     s = _scores(city, category)
+    results = [_cell_payload(c) for c in s.top(limit, ring=_ring)]
+    with db.connect() as conn:
+        for r in results:
+            row = conn.execute(
+                """
+                SELECT name FROM poi.place
+                 WHERE h3_r9 = ANY(%s::h3index[]) AND name <> ''
+                 ORDER BY COALESCE(category_id LIKE ANY (%s), false) DESC, confidence DESC
+                 LIMIT 1
+                """,
+                (list(h3.grid_disk(r["h3"], 1)), [p + "%" for p in scoring.ANCHOR_PREFIXES]),
+            ).fetchone()
+            r["landmark"] = row["name"] if row else None
     _cache_headers(response, 600)
-    return {"category": category, "medians": s.medians,
-            "results": [_cell_payload(c) for c in s.top(limit, ring=_ring)]}
+    return {"category": category, "medians": s.medians, "results": results}
 
 
 @app.get("/v1/cells/{cell}")
