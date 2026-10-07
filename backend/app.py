@@ -285,6 +285,29 @@ def source_categories(city: str, mapped: bool = Query(False), limit: int = Query
 # ───────────────────────────── admin ─────────────────────────────
 
 
+@app.get("/v1/admin/overture-sample")
+def overture_sample(city: str = Query("almaty"), limit: int = Query(25, le=200)) -> dict:
+    """Schema and a sample of raw Overture rows for a city (to tune category mapping)."""
+    from kasmap_api import bootstrap  # noqa: PLC0415
+
+    c = _city_or_404(city)
+    con = bootstrap._duckdb()
+    release = bootstrap.latest_release(con)
+    path = f"{bootstrap.OVERTURE_ROOT}/{release}/theme=places/type=place/*"
+    schema = con.execute(
+        f"DESCRIBE SELECT * FROM read_parquet('{path}', hive_partitioning=1)").fetchall()
+    cols = {r[0] for r in schema}
+    pick = [x for x in ("basic_category", "categories", "taxonomy") if x in cols]
+    rows = con.execute(
+        f"""SELECT names.primary AS name, {', '.join(f'to_json({x}) AS {x}' for x in pick)}
+            FROM read_parquet('{path}', hive_partitioning=1)
+            WHERE bbox.xmin BETWEEN {c.xmin} AND {c.xmax} AND bbox.ymin BETWEEN {c.ymin} AND {c.ymax}
+            LIMIT {int(limit)}"""
+    ).fetchall()
+    return {"release": release, "schema": [[r[0], r[1]] for r in schema],
+            "sample": [dict(zip(["name", *pick], r, strict=True)) for r in rows]}
+
+
 @app.post("/v1/admin/bootstrap")
 def admin_bootstrap(city: str = Query("almaty"), force: bool = Query(False)) -> dict:
     """Load or refresh a city from Overture.  Safe to call repeatedly: a load newer than
