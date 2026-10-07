@@ -19,8 +19,12 @@ class TaxonomyTests(unittest.TestCase):
 
 
 class MappingTests(unittest.TestCase):
-    def test_overture_prefers_basic_category(self):
-        self.assertEqual(c.map_overture("coffee_shop", "restaurant"), "food.cafe.coffee_shop")
+    def test_overture_prefers_most_specific(self):
+        self.assertEqual(c.map_overture("restaurant", "coffee_shop"), "food.cafe.coffee_shop")
+        self.assertEqual(
+            c.map_overture("personal_or_beauty_service", "nail_studio",
+                           ["services", "personal_or_beauty_service", "beauty_salon", "nail_studio"]),
+            "beauty.salon")
         self.assertEqual(c.map_overture(None, "pharmacy"), "health.pharmacy")
         self.assertIsNone(c.map_overture("space_agency", None))
 

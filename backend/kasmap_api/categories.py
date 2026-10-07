@@ -110,6 +110,33 @@ OVERTURE_MAP: Mapping[str, str] = {
     "train_station": "transport.rail",
     "hotel": "lodging.hotel",
     "office_building": "office.business_center",
+    # Overture taxonomy / basic_category names seen in releases from September 2026
+    "dental_clinic": "health.dentist",
+    "dental_office": "health.dentist",
+    "outpatient_care_facility": "health.clinic",
+    "medical_clinic": "health.clinic",
+    "bank_or_credit_union": "finance.bank",
+    "casual_eatery": "food.restaurant",
+    "fast_food_or_quick_service_restaurant": "food.fast_food",
+    "coffee_or_tea_shop": "food.cafe.coffee_shop",
+    "bakery_or_pastry_shop": "food.bakery",
+    "bar_or_pub": "food.bar",
+    "grocery_or_convenience_store": "retail.convenience",
+    "pharmacy_or_drugstore": "health.pharmacy",
+    "beauty_salon_or_barber": "beauty.salon",
+    "barber_shop": "beauty.barber",
+    "barbershop": "beauty.barber",
+    "fitness_studio": "fitness.gym",
+    "gym_or_fitness_center": "fitness.gym",
+    "college_or_university": "education.university",
+    "primary_or_secondary_school": "education.school",
+    "childcare_or_preschool": "education.kindergarten",
+    "day_care_preschool": "education.kindergarten",
+    "hostel": "lodging.hotel",
+    "bus_stop": "transport.bus_stop",
+    "subway_station": "transport.metro",
+    "railway_station": "transport.rail",
+    "corporate_or_business_office": "office.business_center",
 }
 
 # OSM "key=value" → KasMap category. Order of keys checked: see OSM_KEYS.
@@ -150,9 +177,19 @@ OSM_KEYS: tuple[str, ...] = (
 )
 
 
-def map_overture(basic_category: str | None, primary: str | None = None) -> str | None:
-    """Map an Overture place to a KasMap category id (None = unmapped)."""
-    for key in (basic_category, primary):
+def map_overture(
+    basic_category: str | None,
+    primary: str | None = None,
+    hierarchy: list[str] | None = None,
+) -> str | None:
+    """Map an Overture place to a KasMap category id (None = unmapped).
+
+    Most specific first: `taxonomy.primary`, then `taxonomy.hierarchy` from leaf to root,
+    then `basic_category`.  (`categories.primary`, removed in late 2026 releases, is
+    accepted as `primary` for older releases.)
+    """
+    keys = [primary, *reversed(hierarchy or []), basic_category]
+    for key in keys:
         if key and key in OVERTURE_MAP:
             return OVERTURE_MAP[key]
     return None

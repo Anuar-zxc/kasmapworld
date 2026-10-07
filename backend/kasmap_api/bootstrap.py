@@ -122,6 +122,7 @@ def select_list(columns: set[str]) -> str:
     optional = {
         "basic_category": "basic_category",
         "categories": "categories.primary AS category_primary",
+        "taxonomy": "taxonomy.primary AS tax_primary, taxonomy.hierarchy AS tax_hierarchy",
         "confidence": "confidence",
         "websites": "websites[1] AS website",
         "phones": "phones[1] AS phone",
@@ -159,7 +160,9 @@ def to_place(row: dict[str, Any], iso2: str) -> dict[str, Any] | None:
     if confidence is not None and confidence < MIN_CONFIDENCE:
         return None
     lat, lon = row["lat"], row["lon"]
-    category = cats.map_overture(row.get("basic_category"), row.get("category_primary"))
+    primary = row.get("tax_primary") or row.get("category_primary")
+    category = cats.map_overture(row.get("basic_category"), primary,
+                                 list(row.get("tax_hierarchy") or []))
     phone = norm.normalize_phone(row.get("phone"), iso2)
     return {
         "id": place_uuid(row["id"]),
@@ -168,7 +171,7 @@ def to_place(row: dict[str, Any], iso2: str) -> dict[str, Any] | None:
         "name_norm": norm.name_norm(name),
         "brand": row.get("brand"),
         "category_id": category,
-        "source_category": row.get("basic_category") or row.get("category_primary"),
+        "source_category": primary or row.get("basic_category"),
         "lon": lon,
         "lat": lat,
         "h3": h3.latlng_to_cell(lat, lon, 9),
