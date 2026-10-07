@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KasMap — где открыть бизнес в Алматы</title>
+<meta name="description" content="Карта возможностей для бизнеса: где открыть кофейню, аптеку или магазин в Алматы — на открытых данных, с объяснением каждой оценки.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=Unbounded:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
+<style>
+  :root {
+    --ink: #17202b;
+    --muted: #5b6673;
+    --line: #e3e7eb;
+    --paper: #ffffff;
+    --wash: #f4f6f8;
+    --teal: #2e8c84;
+    --deep: #0f4d57;
+    --saffron: #f2b705;
+    --plum: #7a3b6e;
+    --amber: #b86a00;
+    --bad: #b5473a;
+    --radius-lg: 14px;
+    --radius-sm: 8px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; font-family: "Golos Text", system-ui, sans-serif;
+    color: var(--ink); background: var(--wash); -webkit-font-smoothing: antialiased; }
+  #map { position: fixed; inset: 0; }
+  button, select { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--deep); outline-offset: 2px; }
+
+  .panel { position: fixed; top: 16px; left: 16px; bottom: 16px; width: 392px;
+    background: var(--paper); border-radius: var(--radius-lg); box-shadow: 0 1px 2px rgba(23,32,43,.08), 0 8px 28px rgba(23,32,43,.12);
+    display: flex; flex-direction: column; overflow: hidden; z-index: 2; }
+  .panel-head { padding: 20px 22px 16px; border-bottom: 1px solid var(--line); }
+  .brand { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 15px; }
+  .brand svg { flex: none; }
+  .city { color: var(--muted); font-weight: 400; }
+  h1 { font-size: 22px; line-height: 1.25; font-weight: 600; margin: 14px 0 0; letter-spacing: -0.01em; }
+  .panel-body { flex: 1; overflow-y: auto; padding: 18px 22px 22px; }
+
+  .field-label { font-size: 13px; color: var(--muted); margin: 0 0 8px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { border: 1px solid var(--line); background: var(--paper); border-radius: 999px; padding: 6px 12px;
+    font-size: 14px; cursor: pointer; }
+  .chip:hover { border-color: #c7ced5; }
+  .chip[aria-pressed="true"] { background: var(--deep); border-color: var(--deep); color: #fff; }
+  .more { margin-top: 10px; width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--radius-sm);
+    background: var(--paper); font-size: 14px; }
+  .cta { margin-top: 16px; width: 100%; padding: 12px 16px; border: 0; border-radius: var(--radius-sm);
+    background: var(--deep); color: #fff; font-weight: 600; font-size: 15px; cursor: pointer; }
+  .cta:hover { background: #0b3d45; }
+  .cta[disabled] { opacity: .6; cursor: progress; }
+  .hint { font-size: 13px; color: var(--muted); line-height: 1.45; margin: 10px 0 0; }
+
+  .results { list-style: none; margin: 18px 0 0; padding: 0; counter-reset: rank; }
+  .result { display: grid; grid-template-columns: 28px 1fr auto; gap: 10px; align-items: start;
+    padding: 12px 0; border-top: 1px solid var(--line); cursor: pointer; }
+  .result:hover .r-title { text-decoration: underline; }
+  .rank { width: 24px; height: 24px; border-radius: 50%; background: var(--saffron); color: var(--ink);
+    font-size: 13px; font-weight: 600; display: grid; place-items: center; }
+  .r-title { font-size: 14px; font-weight: 500; margin: 2px 0 2px; }
+  .r-why { font-size: 13px; color: var(--muted); line-height: 1.4; }
+  .r-score { font-family: "Unbounded", sans-serif; font-weight: 700; font-size: 18px; color: var(--deep); }
+
+  .detail { margin-top: 20px; padding-top: 18px; border-top: 2px solid var(--ink); }
+  .score-row { display: flex; align-items: flex-end; gap: 14px; }
+  .score { font-family: "Unbounded", sans-serif; font-weight: 700; font-size: 56px; line-height: .9; color: var(--deep); }
+  .score-cap { font-size: 13px; color: var(--muted); line-height: 1.4; padding-bottom: 4px; }
+  .bars { margin: 16px 0 4px; display: grid; gap: 9px; }
+  .bar { display: grid; grid-template-columns: 128px 1fr 34px; align-items: center; gap: 10px; font-size: 13px; }
+  .track { height: 6px; background: var(--wash); border-radius: 3px; overflow: hidden; }
+  .fill { height: 100%; background: var(--teal); border-radius: 3px; }
+  .bar span:last-child { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .why { list-style: none; padding: 0; margin: 14px 0 0; display: grid; gap: 8px; }
+  .why li { font-size: 14px; line-height: 1.45; padding-left: 22px; position: relative; }
+  .why li::before { position: absolute; left: 0; top: 0; width: 16px; text-align: center; font-weight: 600; }
+  .why li.pos::before { content: "+"; color: var(--teal); }
+  .why li.neg::before { content: "−"; color: var(--bad); }
+  .why li.neu::before { content: "?"; color: var(--amber); }
+  h3 { font-size: 14px; font-weight: 600; margin: 18px 0 8px; }
+  .near { list-style: none; padding: 0; margin: 0; font-size: 13px; }
+  .near li { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0; border-bottom: 1px dashed var(--line); }
+  .near li span:last-child { color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .empty-near { font-size: 13px; color: var(--muted); }
+
+  .panel-foot { padding: 12px 22px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); line-height: 1.45; }
+
+  .layers { position: fixed; right: 16px; top: 16px; z-index: 2; background: var(--paper); border-radius: var(--radius-sm);
+    box-shadow: 0 2px 10px rgba(23,32,43,.14); padding: 4px; display: flex; gap: 2px; }
+  .layers button { border: 0; background: transparent; padding: 7px 11px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+  .layers button[aria-pressed="true"] { background: var(--wash); font-weight: 600; }
+  .legend { position: fixed; right: 16px; bottom: 34px; z-index: 2; background: var(--paper); border-radius: var(--radius-sm);
+    box-shadow: 0 2px 10px rgba(23,32,43,.14); padding: 10px 12px; font-size: 12px; color: var(--muted); width: 220px; }
+  .ramp { height: 8px; border-radius: 4px; margin: 6px 0 4px; }
+  .ramp-labels { display: flex; justify-content: space-between; }
+
+  .state { text-align: left; }
+  .state p { font-size: 14px; line-height: 1.5; color: var(--muted); }
+  .spinner { width: 18px; height: 18px; border-radius: 50%; border: 2px solid rgba(255,255,255,.4); border-top-color: #fff;
+    display: inline-block; vertical-align: -3px; margin-right: 8px; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+  .error { color: var(--bad); font-size: 13px; margin-top: 10px; }
+
+  @media (max-width: 720px) {
+    .panel { top: auto; left: 0; right: 0; bottom: 0; width: auto; max-height: 58vh; border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
+    .layers { left: 12px; right: auto; top: 12px; }
+    .legend { display: none; }
+    h1 { font-size: 19px; }
+  }
+</style>
+</head>
+<body>
+<div id="map" role="region" aria-label="Карта Алматы"></div>
+
+<div class="layers" role="group" aria-label="Слой карты">
+  <button data-layer="score" aria-pressed="true">Возможности</button>
+  <button data-layer="competitors" aria-pressed="false">Конкуренты</button>
+  <button data-layer="activity" aria-pressed="false">Активность</button>
+</div>
+<div class="legend" id="legend" hidden></div>
+
+<aside class="panel" aria-label="Подбор локации">
+  <div class="panel-head">
+    <div class="brand">
+      <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 20.66 7v10L12 22 3.34 17V7z" fill="#0f4d57"/><path d="M12 7.5 16.33 10v5L12 17.5 7.67 15v-5z" fill="#f2b705"/></svg>
+      KasMap <span class="city">Алматы</span>
+    </div>
+    <h1 id="headline">Где открыть бизнес в Алматы</h1>
+  </div>
+  <div class="panel-body" id="body"><p class="hint">Загружаем данные…</p></div>
+  <div class="panel-foot" id="foot">Данные: Overture Maps Foundation, © OpenStreetMap contributors.</div>
+</aside>
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/h3-js@4.1.0/dist/h3-js.umd.js"></script>
+<script>
+const CITY = "almaty";
+const FEATURED = ["food.cafe.coffee_shop", "health.pharmacy", "retail.convenience", "food.fast_food",
+  "food.bakery", "beauty.salon", "fitness.gym", "health.dentist"];
+const RAMPS = {
+  score: { stops: ["#eef3f5", "#b9dcd6", "#5aa99f", "#2e8c84", "#0f4d57"], label: "Возможность", lo: "ниже", hi: "выше" },
+  competitors: { stops: ["#f6f1f5", "#dcc0d4", "#b07aa1", "#7a3b6e", "#4a1f43"], label: "Конкуренты рядом", lo: "нет", hi: "много" },
+  activity: { stops: ["#fff7e6", "#fbd890", "#f2b84b", "#d58a1c", "#a35a00"], label: "Активность вокруг", lo: "тихо", hi: "оживлённо" },
+};
+const COMPONENT_NAMES = { activity: "Активность", anchors: "Точки притяжения", competition: "Баланс конкуренции", gap: "Свободная ниша" };
+
+const state = { meta: null, category: "food.cafe.coffee_shop", layer: "score", scores: null, best: [], selected: null };
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+async function api(path, opts) {
+  const r = await fetch(path, opts);
+  if (!r.ok) throw new Error((await r.text()) || r.statusText);
+  return r.json();
+}
+
+const map = new maplibregl.Map({
+  container: "map",
+  style: "https://tiles.openfreemap.org/styles/positron",
+  center: [76.9286, 43.2389], zoom: 11.4, attributionControl: { compact: true },
+});
+map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
+const mapReady = new Promise((res) => map.on("load", res));
+
+function catName(id) { return state.meta?.categories?.find((c) => c.id === id)?.name ?? id; }
+
+function cellsToGeoJSON(cells) {
+  return { type: "FeatureCollection", features: cells.map(([h, score, activity, anchors, competitors]) => {
+    const ring = h3.cellToBoundary(h, true);
+    return { type: "Feature", properties: { h3: h, score, activity, anchors, competitors },
+      geometry: { type: "Polygon", coordinates: [ring] } };
+  }) };
+}
+
+function quantileStops(values, colors) {
+  const s = [...values].sort((a, b) => a - b);
+  const q = (p) => s[Math.min(s.length - 1, Math.floor(p * (s.length - 1)))] ?? 0;
+  const ps = [0, 0.5, 0.75, 0.9, 0.97].map(q);
+  const out = [];
+  let prev = -Infinity;
+  ps.forEach((v, i) => { const x = v > prev ? v : prev + 1e-6; out.push(x, colors[i]); prev = x; });
+  return out;
+}
+
+function paintLayer() {
+  if (!map.getLayer("cells") || !state.scores) return;
+  const ramp = RAMPS[state.layer];
+  let expr;
+  if (state.layer === "score") {
+    expr = ["interpolate", ["linear"], ["get", "score"], 0, ramp.stops[0], 50, ramp.stops[1], 75, ramp.stops[2], 90, ramp.stops[3], 100, ramp.stops[4]];
+  } else {
+    const col = state.layer === "competitors" ? 4 : 2;
+    expr = ["interpolate", ["linear"], ["get", state.layer], ...quantileStops(state.scores.cells.map((c) => c[col]), ramp.stops)];
+  }
+  map.setPaintProperty("cells", "fill-color", expr);
+  const lg = $("legend");
+  lg.hidden = false;
+  lg.innerHTML = `<div>${ramp.label}${state.layer === "score" ? " — " + esc(catName(state.category)).toLowerCase() : ""}</div>
+    <div class="ramp" style="background:linear-gradient(90deg,${ramp.stops.join(",")})"></div>
+    <div class="ramp-labels"><span>${ramp.lo}</span><span>${ramp.hi}</span></div>`;
+}
+
+async function loadScores() {
+  await mapReady;
+  const data = await api(`/v1/cities/${CITY}/scores?category=${encodeURIComponent(state.category)}`);
+  state.scores = data;
+  const gj = cellsToGeoJSON(data.cells);
+  if (map.getSource("cells")) map.getSource("cells").setData(gj);
+  else {
+    map.addSource("cells", { type: "geojson", data: gj });
+    map.addLayer({ id: "cells", type: "fill", source: "cells", paint: { "fill-color": "#eef3f5", "fill-opacity": 0.62 } });
+    map.addLayer({ id: "cells-line", type: "line", source: "cells", paint: { "line-color": "#ffffff", "line-width": 0.4, "line-opacity": 0.6 } });
+    map.addSource("sel", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+    map.addLayer({ id: "sel", type: "line", source: "sel", paint: { "line-color": "#17202b", "line-width": 2.5 } });
+    map.on("click", "cells", (e) => selectCell(e.features[0].properties.h3));
+    map.on("mouseenter", "cells", () => (map.getCanvas().style.cursor = "pointer"));
+    map.on("mouseleave", "cells", () => (map.getCanvas().style.cursor = ""));
+  }
+  paintLayer();
+  loadPlaces();
+}
+
+async function loadPlaces() {
+  const gj = await api(`/v1/cities/${CITY}/places?category=${encodeURIComponent(state.category)}`);
+  if (map.getSource("places")) map.getSource("places").setData(gj);
+  else {
+    map.addSource("places", { type: "geojson", data: gj });
+    map.addLayer({ id: "places", type: "circle", source: "places",
+      paint: { "circle-radius": ["interpolate", ["linear"], ["zoom"], 10, 2, 15, 5], "circle-color": "#7a3b6e",
+        "circle-stroke-color": "#fff", "circle-stroke-width": 1 } });
+    const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 8 });
+    map.on("mouseenter", "places", (e) => { popup.setLngLat(e.lngLat).setText(e.features[0].properties.name).addTo(map); });
+    map.on("mouseleave", "places", () => popup.remove());
+  }
+}
+
+let markers = [];
+function drawBest() {
+  markers.forEach((m) => m.remove());
+  markers = state.best.map((r, i) => {
+    const el = document.createElement("button");
+    el.className = "rank"; el.textContent = i + 1; el.style.border = "2px solid #fff"; el.style.cursor = "pointer";
+    el.setAttribute("aria-label", `Место ${i + 1}, оценка ${r.score}`);
+    el.addEventListener("click", () => selectCell(r.h3));
+    return new maplibregl.Marker({ element: el }).setLngLat(r.center).addTo(map);
+  });
+}
+
+async function findBest() {
+  const btn = $("find");
+  btn.disabled = true; btn.innerHTML = `<span class="spinner"></span>Считаем…`;
+  try {
+    const [, best] = await Promise.all([loadScores(), api(`/v1/cities/${CITY}/best?category=${encodeURIComponent(state.category)}&limit=5`)]);
+    state.best = best.results;
+    drawBest();
+    renderResults();
+    if (state.best.length) {
+      const b = new maplibregl.LngLatBounds();
+      state.best.forEach((r) => b.extend(r.center));
+      map.fitBounds(b, { padding: { top: 80, bottom: 80, left: window.innerWidth > 720 ? 440 : 40, right: 80 }, maxZoom: 14, duration: 900 });
+    }
+  } catch (e) {
+    $("results").innerHTML = `<p class="error">Не удалось посчитать: ${esc(e.message)}</p>`;
+  } finally {
+    btn.disabled = false; btn.textContent = "Найти лучшие места";
+  }
+}
+
+function renderResults() {
+  const el = $("results");
+  if (!state.best.length) { el.innerHTML = `<p class="hint">Для этой категории пока мало данных.</p>`; return; }
+  el.innerHTML = `<ol class="results">${state.best.map((r, i) => `
+    <li class="result" tabindex="0" data-h3="${r.h3}">
+      <span class="rank">${i + 1}</span>
+      <div><div class="r-title">Участок ${i + 1}</div><div class="r-why">${esc(r.why[0]?.text ?? "")}</div></div>
+      <span class="r-score">${r.score}</span>
+    </li>`).join("")}</ol>`;
+  el.querySelectorAll(".result").forEach((li) => {
+    const go = () => selectCell(li.dataset.h3);
+    li.addEventListener("click", go);
+    li.addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
+  });
+}
+
+async function selectCell(h) {
+  state.selected = h;
+  const ring = h3.cellToBoundary(h, true);
+  map.getSource("sel")?.setData({ type: "Feature", geometry: { type: "Polygon", coordinates: [ring] } });
+  const center = h3.cellToLatLng(h);
+  map.easeTo({ center: [center[1], center[0]], zoom: Math.max(map.getZoom(), 14), duration: 700 });
+  const box = $("detail");
+  box.innerHTML = `<p class="hint">Загружаем участок…</p>`;
+  try {
+    const d = await api(`/v1/cells/${h}?city=${CITY}&category=${encodeURIComponent(state.category)}`);
+    if (state.selected !== h) return;
+    const bars = d.components ? Object.entries(COMPONENT_NAMES).map(([k, name]) => {
+      const v = Math.round((d.components[k] ?? 0) * 100);
+      return `<div class="bar"><span>${name}</span><div class="track"><div class="fill" style="width:${v}%"></div></div><span>${v}</span></div>`;
+    }).join("") : "";
+    const cls = { "+": "pos", "-": "neg", "~": "neu" };
+    box.innerHTML = `
+      <div class="score-row"><div class="score">${d.score ?? "—"}</div>
+        <div class="score-cap">из 100 для категории «${esc(catName(state.category).toLowerCase())}».<br>Лучше, чем ${d.score ?? 0}% участков города.</div></div>
+      <div class="bars">${bars}</div>
+      <ul class="why">${(d.why || []).map((w) => `<li class="${cls[w.sign]}">${esc(w.text)}</li>`).join("")}</ul>
+      <h3>Конкуренты рядом</h3>
+      ${d.competitors_nearby.length ? `<ul class="near">${d.competitors_nearby.map((c) => `<li><span>${esc(c.name)}</span><span>${c.distance_m} м</span></li>`).join("")}</ul>` : `<p class="empty-near">В радиусе ~350 м конкурентов нет.</p>`}
+      <h3>Точки притяжения</h3>
+      ${d.anchors_nearby.length ? `<ul class="near">${d.anchors_nearby.map((c) => `<li><span>${esc(c.name)} <span style="color:var(--muted)">${esc(c.category ?? "")}</span></span><span>${c.distance_m} м</span></li>`).join("")}</ul>` : `<p class="empty-near">Вузов, ТРЦ и метро в радиусе ~550 м не найдено.</p>`}`;
+  } catch (e) {
+    box.innerHTML = `<p class="error">Не удалось загрузить участок: ${esc(e.message)}</p>`;
+  }
+}
+
+function renderChooser() {
+  const cats = state.meta.categories.filter((c) => c.count > 0);
+  const featured = FEATURED.map((id) => cats.find((c) => c.id === id)).filter(Boolean);
+  const rest = cats.filter((c) => !FEATURED.includes(c.id));
+  $("body").innerHTML = `
+    <p class="field-label">Что вы открываете?</p>
+    <div class="chips" role="group" aria-label="Тип бизнеса">
+      ${featured.map((c) => `<button class="chip" data-cat="${c.id}" aria-pressed="${c.id === state.category}">${esc(c.name)}</button>`).join("")}
+    </div>
+    <select class="more" id="more" aria-label="Другие типы бизнеса">
+      <option value="">Другой тип бизнеса…</option>
+      ${rest.map((c) => `<option value="${c.id}" ${c.id === state.category ? "selected" : ""}>${esc(c.name)} (${c.count})</option>`).join("")}
+    </select>
+    <button class="cta" id="find">Найти лучшие места</button>
+    <p class="hint">Оценка 0–100 сравнивает участки города по активности вокруг, точкам притяжения и конкуренции. Это сравнительный индекс, а не вероятность успеха.</p>
+    <div id="results"></div>
+    <div id="detail" class="detail" hidden></div>`;
+  const setCat = (id) => {
+    state.category = id; state.best = []; markers.forEach((m) => m.remove()); markers = [];
+    document.querySelectorAll(".chip").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.cat === id)));
+    $("headline").textContent = `Где открыть: ${catName(id).toLowerCase()}`;
+    $("results").innerHTML = ""; $("detail").hidden = true;
+    loadScores().catch(() => {});
+  };
+  document.querySelectorAll(".chip").forEach((b) => b.addEventListener("click", () => { $("more").value = ""; setCat(b.dataset.cat); }));
+  $("more").addEventListener("change", (e) => e.target.value && setCat(e.target.value));
+  $("find").addEventListener("click", findBest);
+  const observer = new MutationObserver(() => { $("detail").hidden = !$("detail").innerHTML.trim(); });
+  observer.observe($("detail"), { childList: true });
+  $("headline").textContent = `Где открыть: ${catName(state.category).toLowerCase()}`;
+  loadScores().catch(() => {});
+}
+
+function renderEmpty(reason) {
+  const text = reason === "database_not_configured"
+    ? "База данных не подключена к проекту."
+    : "Данных по Алматы ещё нет. Загрузка мест из Overture Maps займёт 1–3 минуты.";
+  $("body").innerHTML = `<div class="state"><p>${text}</p>
+    ${reason === "no_data" ? `<button class="cta" id="boot">Загрузить данные Алматы</button><div id="boot-msg"></div>` : ""}</div>`;
+  const b = $("boot");
+  if (b) b.addEventListener("click", async () => {
+    b.disabled = true; b.innerHTML = `<span class="spinner"></span>Загружаем места…`;
+    try {
+      const r = await api(`/v1/admin/bootstrap?city=${CITY}`, { method: "POST" });
+      $("boot-msg").innerHTML = `<p class="hint">Готово: ${r.places ?? r.row_count ?? ""} мест.</p>`;
+      init();
+    } catch (e) {
+      $("boot-msg").innerHTML = `<p class="error">Загрузка не удалась: ${esc(e.message)}</p>`;
+      b.disabled = false; b.textContent = "Попробовать ещё раз";
+    }
+  });
+}
+
+async function init() {
+  try {
+    const meta = await api(`/v1/cities/${CITY}/meta`);
+    state.meta = meta;
+    if (!meta.ready) return renderEmpty(meta.reason);
+    if (meta.data) {
+      const d = new Date(meta.data.loaded_at).toLocaleDateString("ru-RU");
+      $("foot").innerHTML = `${meta.places.toLocaleString("ru-RU")} мест в Алматы. Данные: Overture Maps Foundation, релиз ${esc(meta.data.release)}, обновлено ${d}. © OpenStreetMap contributors.`;
+    }
+    renderChooser();
+  } catch (e) {
+    $("body").innerHTML = `<p class="error">Сервис недоступен: ${esc(e.message)}</p>`;
+  }
+}
+
+document.querySelectorAll(".layers button").forEach((b) => b.addEventListener("click", () => {
+  state.layer = b.dataset.layer;
+  document.querySelectorAll(".layers button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+  paintLayer();
+}));
+
+init();
+</script>
+</body>
+</html>
