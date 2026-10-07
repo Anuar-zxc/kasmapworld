@@ -216,7 +216,7 @@ async function loadScores() {
   const gj = cellsToGeoJSON(data.cells);
   if (map.getSource("cells")) map.getSource("cells").setData(gj);
   else {
-    map.addSource("cells", { type: "geojson", data: gj });
+    map.addSource("cells", { type: "geojson", data: gj, tolerance: 0 });
     map.addLayer({ id: "cells", type: "fill", source: "cells", paint: { "fill-color": "#eef3f5", "fill-opacity": 0.7 } });
     map.addLayer({ id: "cells-line", type: "line", source: "cells", paint: { "line-color": "#ffffff", "line-width": 0.4, "line-opacity": 0.6 } });
     map.addSource("sel", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
